@@ -8,7 +8,7 @@ type Cache struct {
 }
 
 func NewCache() Cache {
-	return Cache{}
+	return Cache{pair: make(map[string]string), keyDeadline: make(map[string]*time.Time)}
 }
 
 func isExpired(deadline *time.Time) bool {
