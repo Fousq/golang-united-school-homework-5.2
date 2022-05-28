@@ -2,41 +2,33 @@ package cache
 
 import "time"
 
-type CachePair struct {
-	key       string
-	value     string
-	expiredIn *time.Time
-}
-
 type Cache struct {
-	pair []CachePair
+	pair        map[string]string
+	keyDeadline map[string]*time.Time
 }
 
 func NewCache() Cache {
 	return Cache{}
 }
 
-func (cachePair *CachePair) isExpired() bool {
-	return cachePair.expiredIn != nil && time.Now().After(*cachePair.expiredIn)
+func isExpired(deadline *time.Time) bool {
+	return deadline != nil && time.Now().After(*deadline)
 }
 
 func (cache *Cache) removeExpired() {
-	expiredIndexes := make([]int, 0)
-	for i := 0; i < len(cache.pair); i++ {
-		if cache.pair[i].isExpired() {
-			expiredIndexes = append(expiredIndexes, i)
+	for key, deadline := range cache.keyDeadline {
+		if isExpired(deadline) {
+			delete(cache.keyDeadline, key)
+			delete(cache.pair, key)
 		}
-	}
-	for _, expiredPairIndex := range expiredIndexes {
-		cache.pair = append(cache.pair[:expiredPairIndex], cache.pair[expiredPairIndex+1:]...)
 	}
 }
 
 func (cache *Cache) Get(key string) (string, bool) {
 	cache.removeExpired()
-	for _, cachePair := range cache.pair {
-		if cachePair.key == key && !cachePair.isExpired() {
-			return cachePair.value, true
+	for pairKey, value := range cache.pair {
+		if pairKey == key {
+			return value, true
 		}
 	}
 	return "", false
@@ -44,21 +36,21 @@ func (cache *Cache) Get(key string) (string, bool) {
 
 func (cache *Cache) Put(key, value string) {
 	cache.removeExpired()
-	cache.pair = append(cache.pair, CachePair{key, value, nil})
+	cache.pair[key] = value
+	cache.keyDeadline[key] = nil
 }
 
 func (cache *Cache) Keys() []string {
 	cache.removeExpired()
-	keys := make([]string, 0, len(cache.pair))
-	for _, cachePair := range cache.pair {
-		if !cachePair.isExpired() {
-			keys = append(keys, cachePair.key)
-		}
+	keys := make([]string, 0, len(cache.keyDeadline))
+	for k := range cache.keyDeadline {
+		keys = append(keys, k)
 	}
 	return keys
 }
 
 func (cache *Cache) PutTill(key, value string, deadline time.Time) {
 	cache.removeExpired()
-	cache.pair = append(cache.pair, CachePair{key, value, &deadline})
+	cache.pair[key] = value
+	cache.keyDeadline[key] = &deadline
 }
